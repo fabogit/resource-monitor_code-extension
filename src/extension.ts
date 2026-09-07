@@ -24,6 +24,8 @@ function formatBytes(bytes: number, precision = 2): string {
 }
 
 export function activate(context: vscode.ExtensionContext): void {
+  console.log('[Resource Monitor NG] Activated successfully');
+
   const statusBarItem = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Left,
     100
