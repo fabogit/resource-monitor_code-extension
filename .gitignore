@@ -1,0 +1,10 @@
+# Dependencies
+node_modules/
+
+# Build artifacts
+dist/
+*.vsix
+
+# Environment & Logs
+*.log
+.DS_Store

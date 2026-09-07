@@ -1,0 +1,127 @@
+{
+  "name": "resource-monitor-ng",
+  "displayName": "Resource Monitor NG",
+  "description": "Ultra-lightweight, zero-overhead Linux resource monitor for VS Code status bar.",
+  "version": "1.0.0",
+  "publisher": "fabo",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fabogit/resource-monitor_code-extension.git"
+  },
+  "categories": [
+    "Other"
+  ],
+  "icon": "images/icon.png",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "resmon.refresh",
+        "title": "Resource Monitor: Refresh Stats"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Resource Monitor Configuration",
+      "properties": {
+        "resmon.show.cpuusage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Toggles the display of CPU usage percentage."
+        },
+        "resmon.show.cpufreq": {
+          "type": "boolean",
+          "default": true,
+          "description": "Toggles the display of CPU frequency."
+        },
+        "resmon.show.cputemp": {
+          "type": "boolean",
+          "default": true,
+          "description": "Toggles the display of CPU temperature."
+        },
+        "resmon.show.mem": {
+          "type": "boolean",
+          "default": true,
+          "description": "Toggles the display of memory consumption."
+        },
+        "resmon.show.battery": {
+          "type": "boolean",
+          "default": true,
+          "description": "Toggles the display of battery percentage remaining."
+        },
+        "resmon.show.disk": {
+          "type": "boolean",
+          "default": false,
+          "description": "Toggles the display of disk space information."
+        },
+        "resmon.disk.format": {
+          "type": "string",
+          "enum": [
+            "PercentRemaining",
+            "PercentUsed",
+            "Remaining",
+            "UsedOutOfTotal"
+          ],
+          "default": "PercentRemaining",
+          "description": "Format for displaying disk space information."
+        },
+        "resmon.disk.drives": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Specific mount paths to monitor. If empty, monitors the workspace root or '/'."
+        },
+        "resmon.updatefrequencyms": {
+          "type": "number",
+          "default": 2000,
+          "minimum": 200,
+          "description": "Update interval in milliseconds."
+        },
+        "resmon.freq.unit": {
+          "type": "string",
+          "enum": [
+            "GHz",
+            "MHz",
+            "KHz",
+            "Hz"
+          ],
+          "default": "GHz",
+          "description": "Unit for CPU frequency display."
+        },
+        "resmon.mem.unit": {
+          "type": "string",
+          "enum": [
+            "GB",
+            "MB",
+            "KB",
+            "B"
+          ],
+          "default": "GB",
+          "description": "Unit for memory display."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.js --production",
+    "watch": "node esbuild.js --watch",
+    "typecheck": "tsc --noEmit",
+    "package": "vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.2.0",
+    "esbuild": "^0.28.0",
+    "typescript": "^7.0.0"
+  }
+}
