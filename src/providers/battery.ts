@@ -2,20 +2,46 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { BatteryInfo } from '../types.js';
 
+/**
+ * Internal descriptor storing paths to a battery's sysfs nodes.
+ */
 interface BatteryPath {
+  /** Path to the integer percentage capacity file (e.g. `.../capacity`). */
   capacityPath: string;
+  /** Path to the string charging state file (e.g. `.../status`). */
   statusPath: string;
 }
 
+/**
+ * Linux power supply and battery status provider.
+ *
+ * Scans `/sys/class/power_supply` for any device named `BAT*` (e.g. `BAT0`, `BAT1`).
+ *
+ * Performance optimization:
+ * - On desktop workstations and servers without battery hardware, it permanently
+ *   disables itself on startup, resulting in zero polling calls and zero CPU overhead.
+ * - On laptops with multiple batteries (e.g. internal + external pack), it aggregates
+ *   overall capacity.
+ */
 export class BatteryProvider {
   private batteries: BatteryPath[] = [];
+
+  /**
+   * Indicates whether at least one battery device is present on this host.
+   */
   public isAvailable = false;
   private discoveryAttempted = false;
 
+  /**
+   * Initializes the provider and checks for power supply hardware.
+   */
   constructor() {
     this.discoverBatteries();
   }
 
+  /**
+   * Discovers battery nodes under `/sys/class/power_supply/`.
+   */
   private discoverBatteries(): void {
     this.discoveryAttempted = true;
     const basePath = '/sys/class/power_supply';
@@ -48,6 +74,11 @@ export class BatteryProvider {
     }
   }
 
+  /**
+   * Reads battery capacity percentage and charging status.
+   *
+   * @returns Aggregated battery state, or `null` if no battery exists or reading fails.
+   */
   public sample(): BatteryInfo | null {
     if (!this.discoveryAttempted) {
       this.discoverBatteries();
@@ -80,7 +111,7 @@ export class BatteryProvider {
             }
           }
         } catch {
-          // Skip unreadable battery
+          // Skip unreadable battery node
         }
       }
 

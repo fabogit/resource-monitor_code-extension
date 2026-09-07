@@ -2,13 +2,26 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { CpuFreqInfo } from '../types.js';
 
+/**
+ * Linux CPU frequency scaling provider.
+ *
+ * Scans `/sys/devices/system/cpu/cpu*` to discover available processor cores and reads
+ * their instantaneous clock frequencies from `cpufreq/scaling_cur_freq`.
+ * Handles core parking and hotplugging by ignoring offline cores dynamically.
+ */
 export class CpuFreqProvider {
   private freqPaths: { coreIndex: number; filePath: string }[] = [];
 
+  /**
+   * Initializes the provider and performs initial core discovery.
+   */
   constructor() {
     this.discoverCores();
   }
 
+  /**
+   * Scans sysfs to identify logical CPU directories and their frequency control endpoints.
+   */
   private discoverCores(): void {
     const basePath = '/sys/devices/system/cpu';
     try {
@@ -36,6 +49,11 @@ export class CpuFreqProvider {
     }
   }
 
+  /**
+   * Samples current clock frequencies across all active cores.
+   *
+   * @returns Average, maximum, and per-core clock frequencies in Hertz, or `null` if no cores could be sampled.
+   */
   public sample(): CpuFreqInfo | null {
     if (this.freqPaths.length === 0) {
       this.discoverCores();
@@ -64,7 +82,7 @@ export class CpuFreqProvider {
           activeCoreCount++;
         }
       } catch {
-        // Core might be offline or sleeping (ENOENT); ignore this tick
+        // Core might be offline, sleeping, or parked (ENOENT); ignore for this tick
       }
     }
 

@@ -2,20 +2,39 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { CpuTempInfo } from '../types.js';
 
+/**
+ * Internal metadata descriptor for an identified hardware thermal sensor.
+ */
 interface DiscoveredSensor {
+  /** Absolute sysfs path to the temperature input file (e.g. `.../temp1_input`). */
   tempFilePath: string;
+  /** Driver or subsystem identifier (e.g. `k10temp`, `coretemp`, `acpi`). */
   sensorName: string;
+  /** Descriptive label associated with the sensor node (e.g. `Tctl`, `Tccd1`). */
   sensorLabel: string;
 }
 
+/**
+ * Hardware-adaptive thermal sensor provider for Linux systems.
+ *
+ * Implements a heuristic startup discovery mechanism that checks `/sys/class/hwmon`
+ * with prioritized support for AMD Zen/Ryzen architectures (`k10temp`, `zenpower`)
+ * and Intel platforms (`coretemp`), with fallback to generic ACPI thermal zones.
+ */
 export class CpuTempProvider {
   private sensor: DiscoveredSensor | null = null;
   private discoveryAttempted = false;
 
+  /**
+   * Initializes the provider and triggers initial sensor discovery.
+   */
   constructor() {
     this.discoverSensor();
   }
 
+  /**
+   * Scans hwmon and thermal zone directories to locate the primary CPU die sensor.
+   */
   private discoverSensor(): void {
     this.discoveryAttempted = true;
     const hwmonBase = '/sys/class/hwmon';
@@ -74,17 +93,23 @@ export class CpuTempProvider {
     }
   }
 
+  /**
+   * Evaluates a single hwmon directory to find the most appropriate temperature input file.
+   *
+   * @param dirPath - Path to the `hwmon*` directory.
+   * @param sensorName - Cleaned name string from `name` file.
+   * @returns Discovered sensor metadata or `null` if no valid input files exist.
+   */
   private findTempInHwmon(dirPath: string, sensorName: string): DiscoveredSensor | null {
     try {
       const files = fs.readdirSync(dirPath);
-      // Prefer temp1_input (often Tctl or Package ID)
+      // Prefer temp1_input (typically Tctl for AMD or Package ID for Intel)
       const inputFiles = files.filter((f: string) => /^temp\d+_input$/.test(f)).sort();
 
       if (inputFiles.length === 0) {
         return null;
       }
 
-      // Check if temp1_input exists, otherwise take first
       const targetFile = inputFiles.includes('temp1_input') ? 'temp1_input' : inputFiles[0]!;
       const tempFilePath = path.join(dirPath, targetFile);
 
@@ -110,6 +135,11 @@ export class CpuTempProvider {
     }
   }
 
+  /**
+   * Reads and parses the current temperature from the discovered sensor file.
+   *
+   * @returns Temperature metrics including value in °C, sensor name, and label, or `null` if reading fails.
+   */
   public sample(): CpuTempInfo | null {
     if (!this.sensor) {
       if (!this.discoveryAttempted) {

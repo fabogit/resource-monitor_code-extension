@@ -1,7 +1,20 @@
 import * as fs from 'node:fs';
 import type { MemoryInfo } from '../types.js';
 
+/**
+ * High-performance, single-pass Linux RAM and Swap usage provider.
+ *
+ * Reads directly from `/proc/meminfo` and parses MemTotal, MemAvailable, SwapTotal,
+ * and SwapFree. Calculates actual memory consumption taking into account modern Linux
+ * kernel memory management heuristics (where buffers and reclaimable page cache are
+ * accounted for in `MemAvailable`).
+ */
 export class MemoryProvider {
+  /**
+   * Samples `/proc/meminfo` and computes memory and swap utilization metrics.
+   *
+   * @returns Comprehensive RAM and Swap metrics in bytes and percentages, or `null` if the virtual file is unreadable.
+   */
   public sample(): MemoryInfo | null {
     try {
       const content = fs.readFileSync('/proc/meminfo', 'utf8');

@@ -10,6 +10,13 @@ import { MemoryProvider } from './providers/memory.js';
 let updateTimer: NodeJS.Timeout | null = null;
 let isUpdating = false;
 
+/**
+ * Formats a raw byte count into a human-readable string with dynamic unit scaling (B, KB, MB, GB, TB).
+ *
+ * @param bytes - The size in bytes to format.
+ * @param precision - Number of decimal places to include (default: 2).
+ * @returns Formatted size string (e.g. '16.42 GB').
+ */
 function formatBytes(bytes: number, precision = 2): string {
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
   let val = bytes;
@@ -23,6 +30,14 @@ function formatBytes(bytes: number, precision = 2): string {
   return `${val.toFixed(precision)} ${units[unitIndex]}`;
 }
 
+/**
+ * Extension entry point invoked by VS Code when the extension is activated.
+ *
+ * Initializes the Status Bar widget, registers commands and configuration listeners,
+ * and launches the periodic resource sampling timer.
+ *
+ * @param context - Extension runtime context provided by VS Code.
+ */
 export function activate(context: vscode.ExtensionContext): void {
   console.log('[Resource Monitor NG] Activated successfully');
 
@@ -41,6 +56,9 @@ export function activate(context: vscode.ExtensionContext): void {
   const diskProvider = new DiskProvider();
   const batteryProvider = new BatteryProvider();
 
+  /**
+   * Executes a single polling tick across all active resource providers and updates the Status Bar.
+   */
   async function update(): Promise<void> {
     if (isUpdating) {
       return;
@@ -170,12 +188,15 @@ export function activate(context: vscode.ExtensionContext): void {
       markdown.isTrusted = true;
       statusBarItem.tooltip = markdown;
     } catch {
-      // Keep previous display on transient sampling error
+      // Retain previous display state on transient read errors
     } finally {
       isUpdating = false;
     }
   }
 
+  /**
+   * Schedules the subsequent update tick using an unreferenced timer to prevent blocking process exits.
+   */
   function scheduleNext(): void {
     const config = getConfig();
     if (updateTimer) {
@@ -210,6 +231,9 @@ export function activate(context: vscode.ExtensionContext): void {
   scheduleNext();
 }
 
+/**
+ * Cleans up extension resources and timer handles when the extension is deactivated.
+ */
 export function deactivate(): void {
   if (updateTimer) {
     clearTimeout(updateTimer);

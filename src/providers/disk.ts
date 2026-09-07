@@ -2,7 +2,20 @@ import * as fs from 'node:fs/promises';
 import * as vscode from 'vscode';
 import type { DiskDriveInfo } from '../types.js';
 
+/**
+ * Asynchronous disk storage utilization provider.
+ *
+ * Uses Node.js `fs.promises.statfs` to query filesystem statistics without invoking
+ * external shell commands (`df`). Supports checking the current active workspace directory,
+ * the system root (`/`), or explicitly configured mount paths.
+ */
 export class DiskProvider {
+  /**
+   * Queries filesystem metrics for the specified mount points or defaults to the workspace root.
+   *
+   * @param configuredDrives - Array of custom paths configured by the user, if any.
+   * @returns Array of disk statistics for each reachable mount point.
+   */
   public async sample(configuredDrives: string[]): Promise<DiskDriveInfo[]> {
     const targetPaths: string[] = [];
 
@@ -39,7 +52,7 @@ export class DiskProvider {
           freePercent,
         });
       } catch {
-        // Path inaccessible, unmounted, or permission denied
+        // Path inaccessible, unmounted, or permission denied; skip gracefully
       }
     }
 
