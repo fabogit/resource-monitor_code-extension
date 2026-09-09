@@ -62,6 +62,58 @@ Resource Monitor NG implements a one-time startup heuristic:
 
 ---
 
+## Multi-Rate Polling & Tick Decimation
+
+High-frequency telemetry (e.g. 200 ms) is valuable for observing short CPU load spikes and clock frequency scaling, but harmful if applied uniformly to slow-moving or I/O-intensive subsystems.
+
+Resource Monitor NG uses a tick decimation strategy to split fast in-memory telemetry from slow subsystem queries:
+
+```
+                  ┌──────────────────────────────────────────────┐
+                  │          Timer Tick (e.g. 200 ms)            │
+                  └──────────────────────┬───────────────────────┘
+                                         │
+                 ┌───────────────────────┴───────────────────────┐
+                 │                                               │
+                 ▼                                               ▼
+         [Fast Telemetry]                                 [Decimation Gate]
+       Every Tick (200 ms)                         tickCount % decimationRatio === 0?
+       - /proc/stat (CPU)                                        │
+       - /proc/meminfo (RAM)                        Yes ─────────┴───────── No
+       - cpufreq (Clocks)                            │                       │
+       - hwmon (Temp)                                ▼                       ▼
+                                              [Slow Telemetry]         [Reuse Cache]
+                                              - BAT* (sysfs)           Skip I/O & sysfs
+                                              - statfs (Disk)
+```
+
+$$\text{decimationRatio} = \max\left(1, \left\lceil \frac{1000}{\text{updateFrequencyMs}} \right\rceil\right)$$
+
+- At `updateFrequencyMs = 200` ms, $\text{decimationRatio} = 5$. Disk and Battery sample once every $5 \times 200 = 1000$ ms. Intermediate ticks reuse the cached values with zero kernel context switches or VFS locks.
+- Manual refresh (`resmon.refresh` command or widget click) immediately bypasses decimation, forcing a full sample of all subsystems and resetting the timer.
+
+---
+
+## UI Lifecycle & Hover Stabilization
+
+In VS Code (Electron/Chromium), mutating properties on a `vscode.StatusBarItem` sends IPC messages that invalidate the renderer DOM node. Unconditional reassignments or redundant `item.show()` invocations destroy active `HoverWidget` popups, causing noticeable flickering or sudden closing while hovering.
+
+Resource Monitor NG enforces two UI stability invariants:
+
+1. **Content Diffing**:
+   - `item.text` is written only if `item.text !== nextText`.
+   - `item.tooltip` is written only if `(item.tooltip as vscode.MarkdownString)?.value !== nextMarkdown`.
+2. **Idempotent Show/Hide**:
+   - `item.show()` is invoked strictly upon creation or when transitioning from hidden to visible. It is never called unconditionally during regular polling ticks.
+3. **Fixed-Width Figure Space (`\u2007`)**:
+   - Numeric percentages and values are padded with Unicode Figure Space (U+2007), which has the exact width of a digit in tabular numbers. This completely prevents horizontal status bar jitter as values fluctuate between single, double, and triple digits.
+4. **Dual Tooltip Modes (`Static` vs `Live`)**:
+   - **`Static` (Default)**: Status bar labels stream live telemetry at high frequency, while rich tooltips remain completely frozen during hover to eliminate Chromium DOM re-rendering flashes. Tooltip details update on manual click or `resmon.refresh`.
+   - **`Live`**: Tooltips update continuously on every timer tick in real-time, following raw telemetry changes.
+   - Switchable dynamically via `resmon.toggleTooltipMode` or through command URI links inside the tooltip Markdown footer.
+
+---
+
 ## Benchmarks & Runtime Footprint
 
 | Metric | Legacy (`systeminformation`) | Resource Monitor NG |

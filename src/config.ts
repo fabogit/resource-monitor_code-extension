@@ -27,6 +27,12 @@ export interface ResMonConfig {
   freqUnit: FreqUnit;
   /** Display unit for memory metrics (GB, MB, KB, B). */
   memUnit: MemUnit;
+  /** Base priority for status bar positioning. */
+  priority: number;
+  /** Status bar alignment side ('Left' | 'Right'). */
+  alignment: 'Left' | 'Right';
+  /** Tooltip refresh mode: 'Static' (on-demand) or 'Live' (continuous real-time). */
+  tooltipMode: 'Static' | 'Live';
 }
 
 /**
@@ -49,6 +55,9 @@ export function getConfig(): ResMonConfig {
     updateFrequencyMs: Math.max(200, config.get<number>('updatefrequencyms', 2000)),
     freqUnit: config.get<FreqUnit>('freq.unit', 'GHz'),
     memUnit: config.get<MemUnit>('mem.unit', 'GB'),
+    priority: config.get<number>('priority', 100),
+    alignment: config.get<'Left' | 'Right'>('alignment', 'Left'),
+    tooltipMode: config.get<'Static' | 'Live'>('tooltip.mode', 'Static'),
   };
 }
 

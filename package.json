@@ -2,7 +2,7 @@
   "name": "resource-monitor-ng",
   "displayName": "Resource Monitor NG",
   "description": "Ultra-lightweight, zero-overhead Linux resource monitor for VS Code status bar.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "publisher": "fabo",
   "engines": {
     "vscode": "^1.85.0"
@@ -25,6 +25,10 @@
       {
         "command": "resmon.refresh",
         "title": "Resource Monitor: Refresh Stats"
+      },
+      {
+        "command": "resmon.toggleTooltipMode",
+        "title": "Resource Monitor: Toggle Tooltip Mode (Static / Live)"
       }
     ],
     "configuration": {
@@ -107,6 +111,29 @@
           ],
           "default": "GB",
           "description": "Unit for memory display."
+        },
+        "resmon.priority": {
+          "type": "number",
+          "default": 100,
+          "description": "Base priority for status bar positioning. Higher values place it further to the left; lower or negative values place it further to the right."
+        },
+        "resmon.alignment": {
+          "type": "string",
+          "enum": [
+            "Left",
+            "Right"
+          ],
+          "default": "Left",
+          "description": "Status bar alignment side."
+        },
+        "resmon.tooltip.mode": {
+          "type": "string",
+          "enum": [
+            "Static",
+            "Live"
+          ],
+          "default": "Static",
+          "description": "Tooltip refresh mode: 'Static' updates tooltips only on manual click/refresh (preventing hover flicker); 'Live' continuously updates tooltips in real time on every polling tick."
         }
       }
     }
