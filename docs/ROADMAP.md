@@ -16,16 +16,20 @@ Resource Monitor NG is designed as an ultra-lightweight, zero-overhead hardware 
 
 ## 2. Phase 0: Foundation & Linux Genesis (v1.0.0 – v1.0.1) [COMPLETED]
 
+> Milestone: [**`v1.0.1 - Foundation & Linux Genesis`**](https://github.com/fabogit/resource-monitor_code-extension/milestone/1) • **Status: Closed** (Tags: [`v1.0.0`](https://github.com/fabogit/resource-monitor_code-extension/releases/tag/v1.0.0), [`v1.0.1`](https://github.com/fabogit/resource-monitor_code-extension/releases/tag/v1.0.1))
+
 The foundational phase established the core extension functionality, UI widgets, configuration toggles, and initial Linux telemetry engine.
 
-- [x] **Initial Linux Telemetry Architecture**:
+- [x] [#17](https://github.com/fabogit/resource-monitor_code-extension/issues/17) **Initial Linux Telemetry Architecture**:
   - Implemented initial virtual filesystem readers for `/proc/stat` and `/proc/meminfo`.
+- [x] [#18](https://github.com/fabogit/resource-monitor_code-extension/issues/18) **Hardware Thermal Detection**:
   - Prototyped hardware thermal detection across `/sys/class/hwmon` and `/sys/class/thermal`.
+- [x] [#19](https://github.com/fabogit/resource-monitor_code-extension/issues/19) **Battery Telemetry**:
   - Built battery status detection via `/sys/class/power_supply`.
-- [x] **Multi-Item Status Bar UI Engine**:
+- [x] [#20](https://github.com/fabogit/resource-monitor_code-extension/issues/20) **Multi-Item Status Bar UI Engine**:
   - Modular status bar items for CPU Usage, CPU Frequency, CPU Temperature, RAM Usage, Battery Level, and Primary Disk Utilization.
   - Priority ordering and alignment within the VS Code Status Bar (`vscode.StatusBarAlignment.Right`).
-- [x] **Interactive Command & Configuration System**:
+- [x] [#21](https://github.com/fabogit/resource-monitor_code-extension/issues/21) **Interactive Command & Configuration System**:
   - Granular toggles (`resmon.show.*`) for each metric.
   - Configurable update intervals and alert thresholds.
   - Interactive commands registered in `package.json`:
@@ -34,7 +38,7 @@ The foundational phase established the core extension functionality, UI widgets,
     - `resmon.toggleCpuLayout`: Toggle CPU per-core layout (Table vs List).
     - `resmon.toggleLoadFormat`: Toggle system load format (Percent vs Value).
     - `resmon.toggleDiskMultiDisplay`: Toggle multi-disk display (All vs Most-Full).
-- [x] **Rich Markdown Tooltip Layout**:
+- [x] [#22](https://github.com/fabogit/resource-monitor_code-extension/issues/22) **Rich Markdown Tooltip Layout**:
   - ASCII visual gauge bars for RAM, Swap, and Storage capacity.
   - Tabular layout for per-core CPU breakdown.
 - [x] **Production Distribution**: Initial deployment to the Visual Studio Code Marketplace.
@@ -43,28 +47,38 @@ The foundational phase established the core extension functionality, UI widgets,
 
 ## 3. Phase 1: Apple Silicon Native Overhaul & Core Refactoring (v1.1.0) [COMPLETED]
 
+> Milestone: [**`v1.1.0 - Apple Silicon Native Overhaul & Core Refactoring`**](https://github.com/fabogit/resource-monitor_code-extension/milestone/2) • **Status: Closed** (Commit: [`f4bd90c`](https://github.com/fabogit/resource-monitor_code-extension/commit/f4bd90c))
+
 Phase 1 restructured the codebase into a strict modular architecture, eliminated technical debt, decoupled storage tracking, and introduced an ultra-fast C++ native addon for Darwin on Apple Silicon.
 
-- [x] **Architectural Modernization & Cleanup**:
+- [x] [#23](https://github.com/fabogit/resource-monitor_code-extension/issues/23) **Architectural Modernization & Cleanup**:
   - Formulated the unified `PlatformProvider` interface (`src/types.ts`).
   - Implemented dynamic runtime factory resolution (`src/platform/factory.ts`).
   - Purged 5 legacy orphaned providers (`src/providers/` v1.0.1 dead code).
-- [x] **Decoupled POSIX Disk Provider (`src/disk/disk_provider.ts`)**:
+- [x] [#24](https://github.com/fabogit/resource-monitor_code-extension/issues/24) **Decoupled POSIX Disk Provider (`src/disk/disk_provider.ts`)**:
   - Replaced legacy filesystem readers with Node.js `fs.promises.statfs`.
   - Completely decoupled disk telemetry from VS Code runtime APIs for cross-platform POSIX execution.
-- [x] **Native C++ Mach/IOKit Addon (`darwin_telemetry.node`)**:
+- [x] [#25](https://github.com/fabogit/resource-monitor_code-extension/issues/25) **Native C++ Mach/IOKit Addon (`darwin_telemetry.node`)**:
   - Direct Mach kernel `host_processor_info` calls for instantaneous CPU core ticks.
-  - Hardware topology detection via `sysctlbyname` (differentiating Apple Silicon P-Cores and E-Cores).
-  - Normalized system load average calculated across available physical execution cores.
   - In-process Apple Silicon SMC/PMU thermal telemetry (monitoring 24 die sensors with peak detection).
   - Apple Smart Battery telemetry via IOKit (cycle count, actual capacity, design capacity, discharge rate, health %).
   - Mach virtual memory statistics (`host_statistics64`) capturing memory pressure, wired RAM, and compressed memory.
-- [x] **Toolchain & Automated Test Suite**:
+- [x] [#26](https://github.com/fabogit/resource-monitor_code-extension/issues/26) **Hardware Topology Detection**:
+  - Distinguishing Performance (P-Cores) and Efficiency (E-Cores) via `sysctlbyname`.
+- [x] [#27](https://github.com/fabogit/resource-monitor_code-extension/issues/27) **Normalized System Load Average**:
+  - Calculated across available physical execution cores, toggleable between percentage and raw queue depth.
+- [x] [#28](https://github.com/fabogit/resource-monitor_code-extension/issues/28) **In-Process SoC Thermal Telemetry**:
+  - Unprivileged `IOHIDEventSystemClient` event tap sampling 24 die sensors with peak detection.
+- [x] [#29](https://github.com/fabogit/resource-monitor_code-extension/issues/29) **Apple Smart Battery Telemetry**:
+  - IOKit registry query extracting cycle count, actual capacity, design capacity, discharge rate, and health %.
+- [x] [#30](https://github.com/fabogit/resource-monitor_code-extension/issues/30) **Mach Virtual Memory Statistics**:
+  - Capturing memory pressure, wired RAM, and compressed memory dynamics.
+- [x] [#31](https://github.com/fabogit/resource-monitor_code-extension/issues/31) **Toolchain & Automated Test Suite**:
   - Zero-dependency Clang compilation script (`native/darwin/compile.sh`).
   - Native Apple Silicon smoke test (`test/smoke-darwin.mjs`).
   - Cross-platform end-to-end integration test (`test/integration.ts`).
   - Linux baseline smoke test (`test/smoke-linux.ts`).
-- [x] **Ecosystem & Build Modernization**:
+- [x] [#32](https://github.com/fabogit/resource-monitor_code-extension/issues/32) **Ecosystem & Build Modernization**:
   - Modernized engine requirements: `engines.vscode: ^1.105.0`, `engines.node: >=20.0.0`.
   - Aligned development dependencies: `@types/node: ^22.0.0`, `@types/vscode: ~1.105.0`, `@vscode/vsce: ^3.9.0`.
   - Automated targeted packaging for `darwin-arm64`.
@@ -73,68 +87,61 @@ Phase 1 restructured the codebase into a strict modular architecture, eliminated
 
 ## 4. Phase 2: Linux Telemetry Modernization & Parity (v1.2.0) [IN PROGRESS]
 
+> Milestone: [**`v1.2.0 - Linux Telemetry Modernization & Parity`**](https://github.com/fabogit/resource-monitor_code-extension/milestone/3) • **Status: Open** (Active Target)
+
 Phase 2 focuses on bringing the Linux implementation up to the v1.1.0 architectural standard, establishing empirical performance baselines, and verifying telemetry directly on a native Linux workstation.
 
-- [ ] **Phase 2.1: Native Linux Workstation Setup & Baseline Implementation**:
-  - Transfer codebase to physical Linux testing environment.
-  - Implement modernized `LinuxTelemetryProvider` complying strictly with `PlatformProvider`:
-    - **CPU Utilization**: High-resolution delta tick sampling via `/proc/stat`.
-    - **CPU Frequency**: Single-pass parsing of `/proc/cpuinfo` or batch query of `/sys/devices/system/cpu/`.
-    - **Memory Telemetry**: Deep parsing of `/proc/meminfo` (`MemAvailable`, `MemFree`, `Buffers`, `Cached`, `SwapTotal`, `SwapFree`).
-    - **Hardware Thermal Sensors**: Dynamic multi-driver scanning of `/sys/class/hwmon` (`coretemp`, `k10temp`, `zenpower`) with fallback handling.
-    - **Battery Telemetry**: Adaptive power profiling via `/sys/class/power_supply` (with zero-overhead detection on desktop/server/VM nodes).
-    - **Storage**: Multi-mount validation using the decoupled POSIX `DiskProvider`.
-- [ ] **Phase 2.2: Empirical Benchmarking & Scientific Evaluation**:
-  - Measure execution latency of the TypeScript VFS reader at $200\,\text{ms}$ polling intervals (`performance.now()`).
+- [ ] [#1](https://github.com/fabogit/resource-monitor_code-extension/issues/1) **CPU Cold-Start Synchronization (Tick 0)**:
+  - Pre-sample `/proc/stat` in constructor of `CpuProvider` to prime tick counters immediately.
+- [ ] [#2](https://github.com/fabogit/resource-monitor_code-extension/issues/2) **CPU Frequency Monospace Table Layout**:
+  - Convert Markdown bulleted core frequency list into compact monospace ASCII cluster table for `freqOrLoad.kind === 'freq'`.
+- [ ] [#3](https://github.com/fabogit/resource-monitor_code-extension/issues/3) **Battery Autonomy & Time Remaining**:
+  - Parse sysfs `power_now` / `current_now` and `time_to_empty_now` / `time_to_full_now` to calculate `timeRemainingMinutes`.
+- [ ] [#4](https://github.com/fabogit/resource-monitor_code-extension/issues/4) **Dynamic Hardware Thermal Trip Points**:
+  - Detect `temp*_crit` / `temp*_max` from `/sys/class/hwmon/` to dynamically populate `critCelsius` instead of hardcoded 100 °C.
+- [ ] [#5](https://github.com/fabogit/resource-monitor_code-extension/issues/5) **Empirical Benchmarking & Scientific Evaluation**:
+  - Measure execution latency of TypeScript VFS reader at 200 ms polling intervals (`performance.now()`) against the < 250 µs SLA budget.
   - Profile V8 garbage collection overhead and heap allocation stability.
-  - **Decision Gate**:
-    - If TypeScript VFS parsing latency stays consistently under $250\,\mu\text{s}$ with negligible GC impact: retain the pure TypeScript engine for maximum cross-distribution compatibility (Ubuntu, Fedora, Arch, Debian, Alpine, x86_64, aarch64).
-    - If latency or multi-core parsing on high-core workstations (e.g. 32+ cores) degrades performance: implement a dedicated native C++ addon (`native/linux/linux_telemetry.cc`) leveraging unbuffered `read()` into a stack buffer.
-- [ ] **Phase 2.3: Multi-Platform Test Validation & Packaging**:
-  - Execute `test:linux` and `test:integration` on live Linux kernel.
-  - Configure GitHub Actions CI matrix build for `linux-x64` and `linux-arm64`.
-  - Release v1.2.0.
+- [ ] [#6](https://github.com/fabogit/resource-monitor_code-extension/issues/6) **Cross-Platform Dual-Runner CI/CD**:
+  - Configure `.github/workflows/release.yml` with dual-runner matrix (`macos-14` + `ubuntu-latest`) and `workflow_dispatch`.
 
 ---
 
 ## 5. Phase 3: Windows NT Architecture & Win32 Telemetry (v1.3.0) [PLANNED]
 
+> Milestone: [**`v1.3.0 - Windows NT Architecture & Win32 Telemetry`**](https://github.com/fabogit/resource-monitor_code-extension/milestone/4) • **Status: Open** (Future Roadmap)
+
 Phase 3 introduces native Windows support through direct Win32 API bindings, adhering to the modular UI strategy and pragmatic hardware constraints.
 
-- [ ] **Architectural Blueprint & Toolchain**:
-  - Implement `WindowsTelemetryProvider` implementing `PlatformProvider`.
-  - Reject CLI/PowerShell/WMI script spawning to maintain the < 0.5% CPU SLA.
-  - Design native C++ Win32 addon (`windows_telemetry.node`) compiled via MSVC.
-- [ ] **Win32 Core Telemetry Implementations**:
-  - **CPU Utilization**: Query per-core and aggregate CPU utilization using Performance Data Helper (PDH) or `GetSystemProcessorPerformanceInformation` via `ntdll.dll`.
-  - **Memory Statistics**: Instantaneous RAM, pagefile, and commit charge querying via `GlobalMemoryStatusEx`.
-  - **Battery Telemetry**: AC line status, discharge state, and percentage via `GetSystemPowerStatus`.
-  - **Drive Storage**: Enumerate active logical drives and query storage via `GetDiskFreeSpaceExW`.
-- [ ] **Thermal Telemetry Pragmatic Strategy**:
-  - Analyze unprivileged user-space limitations: Windows does not provide standard user-space APIs for CPU core temperatures without Ring-0 kernel drivers.
-  - Evaluate non-blocking fallback to `MSAcpi_ThermalZoneTemperature` (WMI) where supported by OEM BIOS; gracefully omit temperature item on unsupported systems without blocking execution.
-- [ ] **Windows Packaging & Distribution**:
-  - Build pipeline for `win32-x64` and `win32-arm64`.
-  - Dedicated Windows integration tests.
-  - Release v1.3.0.
+- [ ] [#7](https://github.com/fabogit/resource-monitor_code-extension/issues/7) **Architectural Blueprint & Toolchain**:
+  - Design `WindowsTelemetryProvider` conforming to `TelemetryPlatformProvider`.
+  - Design native C++ Win32 addon (`windows_telemetry.node`) compiled via MSVC without subprocess spawning.
+- [ ] [#8](https://github.com/fabogit/resource-monitor_code-extension/issues/8) **CPU Utilization**:
+  - Query per-core and aggregate CPU utilization using Performance Data Helper (PDH) or `GetSystemProcessorPerformanceInformation` via `ntdll.dll`.
+- [ ] [#9](https://github.com/fabogit/resource-monitor_code-extension/issues/9) **Memory Statistics**:
+  - Instantaneous RAM, pagefile, and commit charge querying via `GlobalMemoryStatusEx`.
+- [ ] [#10](https://github.com/fabogit/resource-monitor_code-extension/issues/10) **Battery Telemetry**:
+  - AC line status, discharge state, and percentage via `GetSystemPowerStatus`.
+- [ ] [#11](https://github.com/fabogit/resource-monitor_code-extension/issues/11) **Drive Storage**:
+  - Enumerate active logical drives and query storage via `GetDiskFreeSpaceExW`.
+- [ ] [#12](https://github.com/fabogit/resource-monitor_code-extension/issues/12) **Thermal Telemetry Pragmatic Strategy**:
+  - Evaluate non-blocking fallback to `MSAcpi_ThermalZoneTemperature` (WMI) where supported by OEM BIOS.
+- [ ] [#13](https://github.com/fabogit/resource-monitor_code-extension/issues/13) **Windows Packaging & Distribution**:
+  - Build pipeline for `win32-x64` and `win32-arm64` with dedicated Windows integration tests.
 
 ---
 
 ## 6. Phase 4: Internationalization & Localization (v1.4.0) [NICE TO HAVE]
 
+> Milestone: [**`v1.4.0 - Internationalization & Localization`**](https://github.com/fabogit/resource-monitor_code-extension/milestone/5) • **Status: Open** (Backlog)
+
 Phase 4 externalizes and translates user-facing strings once the underlying telemetry data models across Darwin, Linux, and Windows are fully consolidated.
 
-- [ ] **Localization Infrastructure**:
+- [ ] [#14](https://github.com/fabogit/resource-monitor_code-extension/issues/14) **Localization Infrastructure**:
   - Integrate VS Code official `vscode.l10n` API.
   - Extract all hardcoded strings from `src/extension.ts` into source bundle `l10n/bundle.core.json`.
   - Localize command titles, categories, and configuration settings in `package.nls.json`.
-- [ ] **Translation Bundles**:
-  - Italian (`bundle.core.it.json`).
-  - German (`bundle.core.de.json`).
-  - French (`bundle.core.fr.json`).
-  - Spanish (`bundle.core.es.json`).
-  - Japanese (`bundle.core.ja.json`).
-  - Simplified Chinese (`bundle.core.zh-cn.json`).
-- [ ] **Layout Resilience**:
+- [ ] [#15](https://github.com/fabogit/resource-monitor_code-extension/issues/15) **Translation Bundles**:
+  - Italian (`bundle.core.it.json`), German (`bundle.core.de.json`), French (`bundle.core.fr.json`), Spanish (`bundle.core.es.json`), Japanese (`bundle.core.ja.json`), Simplified Chinese (`bundle.core.zh-cn.json`).
+- [ ] [#16](https://github.com/fabogit/resource-monitor_code-extension/issues/16) **Layout Resilience**:
   - Audit Markdown tooltip tables and ASCII progress bars to prevent visual wrapping or layout misalignment caused by variable-length translated strings.
-  - Release v1.4.0.
