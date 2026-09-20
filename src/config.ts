@@ -33,6 +33,12 @@ export interface ResMonConfig {
   alignment: 'Left' | 'Right';
   /** Tooltip refresh mode: 'Static' (on-demand) or 'Live' (continuous real-time). */
   tooltipMode: 'Static' | 'Live';
+  /** CPU core breakdown layout in tooltip: 'Table' (compact side-by-side grid) or 'List' (vertical clusters). */
+  cpuTooltipLayout: 'Table' | 'List';
+  /** Multi-disk status bar display mode: 'All' or 'MostFull'. */
+  diskMultiDisplay: 'All' | 'MostFull';
+  /** Format used to display System Load Average on Darwin: 'Percent' or 'Value'. */
+  loadFormat: 'Percent' | 'Value';
 }
 
 /**
@@ -52,12 +58,15 @@ export function getConfig(): ResMonConfig {
     showDisk: config.get<boolean>('show.disk', false),
     diskFormat: config.get<DiskSpaceFormat>('disk.format', 'PercentRemaining'),
     diskDrives: config.get<string[]>('disk.drives', []),
+    diskMultiDisplay: config.get<'All' | 'MostFull'>('disk.multiDisplay', 'All'),
     updateFrequencyMs: Math.max(200, config.get<number>('updatefrequencyms', 2000)),
     freqUnit: config.get<FreqUnit>('freq.unit', 'GHz'),
     memUnit: config.get<MemUnit>('mem.unit', 'GB'),
     priority: config.get<number>('priority', 100),
     alignment: config.get<'Left' | 'Right'>('alignment', 'Left'),
     tooltipMode: config.get<'Static' | 'Live'>('tooltip.mode', 'Static'),
+    cpuTooltipLayout: config.get<'Table' | 'List'>('tooltip.cpuLayout', 'Table'),
+    loadFormat: config.get<'Percent' | 'Value'>('loadFormat', 'Percent'),
   };
 }
 

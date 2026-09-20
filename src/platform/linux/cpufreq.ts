@@ -1,13 +1,13 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { CpuFreqInfo } from '../types.js';
+import type { CpuFreqInfo } from '../../types.js';
 
 /**
  * Linux CPU frequency scaling provider.
  *
  * Scans `/sys/devices/system/cpu/cpu*` to discover available processor cores and reads
  * their instantaneous clock frequencies from `cpufreq/scaling_cur_freq`.
- * Handles core parking and hotplugging by ignoring offline cores dynamically.
+ * Handles core parking and hotplugging by ignoring offline cores dynamically without sparse holes.
  */
 export class CpuFreqProvider {
   private freqPaths: { coreIndex: number; filePath: string }[] = [];
@@ -66,8 +66,12 @@ export class CpuFreqProvider {
     let sumHz = 0;
     let maxHz = 0;
     let activeCoreCount = 0;
+    let maxCoreIndex = -1;
 
     for (const { coreIndex, filePath } of this.freqPaths) {
+      if (coreIndex > maxCoreIndex) {
+        maxCoreIndex = coreIndex;
+      }
       try {
         const raw = fs.readFileSync(filePath, 'utf8').trim();
         const khz = parseInt(raw, 10);
@@ -91,6 +95,13 @@ export class CpuFreqProvider {
     }
 
     const avgHz = sumHz / activeCoreCount;
+
+    // Default missing or parked cores to 0 Hz to avoid sparse holes
+    for (let i = 0; i <= maxCoreIndex; i++) {
+      if (perCoreHz[i] === undefined) {
+        perCoreHz[i] = 0;
+      }
+    }
 
     return {
       avgHz,

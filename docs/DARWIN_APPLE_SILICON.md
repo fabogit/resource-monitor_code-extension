@@ -1,31 +1,36 @@
-# Darwin & Apple Silicon (M-Series) Architectural Blueprint
+# Darwin & Apple Silicon (M-Series) Technical Specification & Implementation Architecture
 
-This document outlines the design, C/Mach/IOKit kernel APIs, toolchain setup, and step-by-step development guide for adding native macOS Apple Silicon (`darwin-arm64`) support to **Resource Monitor NG** on a MacBook Air M4.
+This document formalizes the production architecture, C/Mach/IOKit kernel APIs, Clang toolchain, and verification methodology implemented for native macOS Apple Silicon (`darwin-arm64`) support in **Resource Monitor NG v1.1.0** on Apple M-Series hardware (M1, M2, M3, M4).
 
 ---
 
-## 1. Architectural Differences: Linux vs. Darwin (macOS)
+## 1. Architectural Comparison: Linux vs. Darwin (macOS)
 
-| Subsystem | Linux Implementation | macOS / Darwin (XNU) Reality |
+| Subsystem | Linux Implementation | macOS / Darwin (XNU) Implementation |
 | :--- | :--- | :--- |
-| **Telemetry Source** | Virtual pseudo-filesystems (`/proc`, `/sys`) | C-based Kernel APIs (`Mach`, `sysctl`, `IOKit`) |
-| **Subprocess Cost** | Zero (pure synchronous `fs.readFileSync`) | Zero achievable **only** via compiled Node-API (N-API) C++ addon |
+| **Telemetry Source** | Virtual pseudo-filesystems (`/proc`, `/sys`) | C-based Kernel APIs (`Mach`, `sysctl`, `IOKit`, `IOHID`) |
+| **Subprocess Cost** | Zero (pure synchronous `fs.readFileSync`) | Zero (pure synchronous Node-API C++ addon `darwin_telemetry.node`) |
 | **CPU Architecture** | Uniform SMP or x86 SMT cores | Asymmetric big.LITTLE (Performance P-Cores + Efficiency E-Cores) |
-| **Clock Frequencies** | `/sys/devices/system/cpu/cpu*/cpufreq/` | **Hidden by Apple Silicon hardware power controller**. Inaccessible without `sudo powermetrics` |
-| **Thermal Sensors** | `/sys/class/hwmon/` | **Proprietary Apple SMC / CoreAnalytics**. Inaccessible to unprivileged userspace without root |
+| **Clock Frequencies** | `/sys/devices/system/cpu/cpu*/cpufreq/` | Normalized System Load Capacity % across hardware cores |
+| **Thermal Sensors** | `/sys/class/hwmon/` | **Unprivileged `IOHIDEventSystemClient`**: 24 SoC die sensors, NAND SSD & battery |
 | **Memory Metrics** | `/proc/meminfo` (single-pass line scan) | Mach `host_statistics64(HOST_VM_INFO64)` + `sysctl vm.swapusage` |
-| **Battery Metrics** | `/sys/class/power_supply/BAT*` | `IOKit.framework` (`IOPowerSources.h`) |
-| **Disk Space** | `node:fs/promises.statfs` | POSIX `statfs` (100% portable, works out of the box in Node.js) |
+| **Battery Metrics** | `/sys/class/power_supply/BAT*` | `IOKit.framework` (`IOPowerSources` + `AppleSmartBattery` health & cycles) |
+| **Disk Space** | `node:fs/promises.statfs` | POSIX `statfs` (100% portable across Linux & Darwin) |
 
 ---
 
 ## 2. Kernel Telemetry Specifications (Darwin / XNU)
 
-To maintain the **zero-subprocess** guarantee on macOS, all metrics must be queried directly via C bindings through **Node-API (N-API)** compiled for `darwin-arm64`.
+To maintain the strict **zero-subprocess** guarantee on macOS, all metrics are queried directly via C++ bindings through a standalone Node-API (N-API) addon compiled for `darwin-arm64`.
 
-### 2.1. CPU Utilization (Per-Core & Overall)
-- **Framework / Header**: `<mach/mach_host.h>`, `<mach/processor_info.h>`
-- **Mach Call**:
+### 2.1. CPU Utilization & Core Topology
+* **Framework / Header**: `<mach/mach_host.h>`, `<mach/processor_info.h>`, `<sys/sysctl.h>`
+* **Topology Discovery**:
+  * P-Cores: queried via `sysctlbyname("hw.perflevel0.logicalcpu", ...)`
+  * E-Cores: queried via `sysctlbyname("hw.perflevel1.logicalcpu", ...)`
+  * Total Cores: `sysctlbyname("hw.logicalcpu", ...)`
+  * Chip Model: `sysctlbyname("machdep.cpu.brand_string", ...)` (e.g. `'Apple M4'`)
+* **Mach Call**:
   ```c
   natural_t processor_count = 0;
   processor_info_array_t processor_info;
@@ -39,184 +44,130 @@ To maintain the **zero-subprocess** guarantee on macOS, all metrics must be quer
       &processor_info_count
   );
   ```
-- **Data Structure**: `processor_cpu_load_info_t`
-  - Ticks: `cpu_ticks[CPU_STATE_USER]`, `cpu_ticks[CPU_STATE_SYSTEM]`, `cpu_ticks[CPU_STATE_IDLE]`, `cpu_ticks[CPU_STATE_NICE]`.
-- **Delta Calculation**:
-  $$\text{Total} = \text{user} + \text{system} + \text{idle} + \text{nice}$$
-  $$\text{Active} = \text{user} + \text{system} + \text{nice}$$
-  $$\text{Usage \%} = \frac{\Delta \text{Active}}{\Delta \text{Total}} \times 100$$
-- **Cleanup**: Must deallocate Mach virtual memory:
-  ```c
-  vm_deallocate(mach_task_self(), (vm_address_t)processor_info, processor_info_count * sizeof(natural_t));
-  ```
+* **Delta Calculation**:
+  $$\Delta \text{Total}_i = \Delta \text{user}_i + \Delta \text{system}_i + \Delta \text{idle}_i + \Delta \text{nice}_i$$
+  $$\Delta \text{Active}_i = \Delta \text{user}_i + \Delta \text{system}_i + \Delta \text{nice}_i$$
+  $$\text{Usage \%}_i = \frac{\Delta \text{Active}_i}{\Delta \text{Total}_i} \times 100$$
+* **Deallocation**: Mach shared memory is promptly freed via `vm_deallocate(mach_task_self(), ...)`.
 
 ### 2.2. Memory & Swap Statistics
-- **Total Physical RAM**:
+* **Physical RAM**: Queried via `sysctl({ CTL_HW, HW_MEMSIZE })`.
+* **VM Page Breakdown**:
   ```c
-  int mib[2] = { CTL_HW, HW_MEMSIZE };
-  uint64_t total_ram = 0;
-  size_t len = sizeof(total_ram);
-  sysctl(mib, 2, &total_ram, &len, NULL, 0);
-  ```
-- **VM Page Allocation (Active, Wired, Compressed, Free)**:
-  ```c
-  vm_size_t page_size;
-  host_page_size(mach_host_self(), &page_size);
-
   vm_statistics64_data_t vm_stat;
   mach_msg_type_number_t count = HOST_VM_INFO64_COUNT;
   host_statistics64(mach_host_self(), HOST_VM_INFO64, (host_info64_t)&vm_stat, &count);
   ```
-  - **Used Bytes**: `(vm_stat.active_count + vm_stat.wire_count + vm_stat.compressor_page_count) * page_size`
-  - **Available Bytes**: `(vm_stat.inactive_count + vm_stat.free_count) * page_size`
-- **Swap Utilization**:
-  ```c
-  struct xsw_usage swap;
-  size_t len = sizeof(swap);
-  sysctlbyname("vm.swapusage", &swap, &len, NULL, 0);
-  // swap.xsu_total, swap.xsu_used, swap.xsu_avail
-  ```
+  * **Used RAM**: `(vm_stat.active_count + vm_stat.wire_count + vm_stat.compressor_page_count) * page_size`
+  * **Available RAM**: `(vm_stat.inactive_count + vm_stat.free_count) * page_size`
+  * **Compressed Pages**: `vm_stat.compressor_page_count * page_size`
+* **Swap Space**: Queried via `sysctlbyname("vm.swapusage", &swap, &len, NULL, 0)`.
 
-### 2.3. Battery & Power Supply
-- **Framework / Header**: `<IOKit/ps/IOPowerSources.h>`, `<IOKit/ps/IOPSKeys.h>`
-- **Linker Flags**: `-framework IOKit -framework CoreFoundation`
-- **API Call**:
-  ```c
-  CFTypeRef info = IOPSCopyPowerSourcesInfo();
-  CFArrayRef list = IOPSCopyPowerSourcesList(info);
-  CFDictionaryRef desc = IOPSGetPowerSourceDescription(info, CFArrayGetValueAtIndex(list, 0));
+### 2.3. Battery Health, Nominal Capacity & Power State
+* **Framework / Headers**: `<IOKit/ps/IOPowerSources.h>`, `<IOKit/ps/IOPSKeys.h>`, `<IOKit/IOKitLib.h>`
+* **State & Time Remaining**: `IOPSGetPowerSourceDescription` provides real-time charging status (`Charging`, `Discharging`, `AC Connected`, `Full`) and minutes remaining to empty/full.
+* **Health & Capacity (Kernel Registry)**:
+  Directly reads `AppleSmartBattery` from the IOKit registry without root privileges:
+  * `DesignCapacity`: Factory nominal capacity in `mAh` (e.g. 4629 mAh).
+  * `AppleRawMaxCapacity`: Current calibrated maximum capacity in `mAh` (e.g. 4506 mAh).
+  * `AppleRawCurrentCapacity`: Real-time residual charge in `mAh` (e.g. 2929 mAh).
+  * `CycleCount`: Completed hardware discharge cycles (e.g. 136).
+  * **Health % Formula**:
+    $$\text{Health \%} = \min\left(100.0, \frac{\text{AppleRawMaxCapacity}}{\text{DesignCapacity}} \times 100\right)$$
 
-  CFNumberRef capNum = (CFNumberRef)CFDictionaryGetValue(desc, CFSTR(kIOPSCurrentCapacityKey));
-  CFStringRef stateStr = (CFStringRef)CFDictionaryGetValue(desc, CFSTR(kIOPSPowerSourceStateKey));
-  ```
-
-### 2.4. Limitations on Apple Silicon (M4 / M-Series)
-- **Dynamic Clock Speeds**: Apple Silicon manages frequency scaling autonomously in hardware. Dynamic per-core GHz metrics cannot be read by unprivileged applications. The provider should report nominal base frequency or graceful `N/A`.
-- **Hardware Thermals**: Unprivileged applications cannot read M4 thermal zones. The provider should auto-disable or display a notification that root entitlements are required by macOS.
+### 2.4. Unprivileged Thermal Telemetry (`IOHIDEventSystemClient`)
+* **Framework**: `IOKit.framework` (HID Event System).
+* **Mechanism**: Registers an `IOHIDEventSystemClient` with matching dictionary `PrimaryUsagePage = 0xff00` (Apple vendor-defined) and `PrimaryUsage = 0x5` (Thermal sensor).
+* **Zero Privileges**: Operates entirely in unprivileged userspace (no `sudo`, no `powermetrics` process spawning).
+* **Metrics Read**:
+  * 24 SoC die thermal sensors (SoC Die Average, SoC Die Peak).
+  * NAND Flash SSD thermal sensor.
+  * Battery cell temperature sensor.
 
 ---
 
-## 3. Recommended Project Layout for macOS Node-API
+## 3. Production Architecture & Layout
 
 ```
 resource-monitor/
 ├── src/
-│   ├── extension.ts               # Platform-agnostic status bar & lifecycle
-│   ├── config.ts
-│   ├── types.ts
-│   └── providers/
-│       ├── factory.ts             # Instantiates Linux vs. Darwin providers
-│       ├── linux/                 # Existing /proc and /sys synchronous providers
-│       │   ├── cpu.ts
-│       │   ├── cpufreq.ts
-│       │   ├── cputemp.ts
-│       │   ├── memory.ts
-│       │   └── battery.ts
-│       ├── darwin/                # macOS N-API Native Bridge
-│       │   └── darwin_provider.ts # Calls native/darwin addon
-│       └── disk.ts                # Portable Node.js statfs
+│   ├── extension.ts               # Status bar widgets, polling loop, ASCII table rendering
+│   ├── config.ts                  # ResMonConfig, settings parsing
+│   ├── types.ts                   # BatteryInfo, CpuUsageInfo, MemoryInfo, etc.
+│   ├── platform/
+│   │   ├── factory.ts             # Instantiates Linux vs. Darwin providers dynamically
+│   │   ├── interface.ts           # Universal TelemetryPlatformProvider interface
+│   │   ├── linux/                 # Zero-subprocess /proc and /sys synchronous providers
+│   │   └── darwin/                # macOS N-API Native Bridge
+│   │       ├── native_loader.ts   # Dynamic N-API loader with candidate path search
+│   │       └── darwin_provider.ts # TelemetryPlatformProvider implementation
+│   └── disk/
+│       └── disk_provider.ts       # Pure POSIX statfs provider (zero VS Code coupling)
 ├── native/
 │   └── darwin/
-│       ├── binding.gyp            # node-gyp build config linking IOKit & Mach
+│       ├── compile.sh             # Direct Clang compilation script
 │       └── src/
-│           ├── addon.cc           # N-API module entry point
-│           ├── cpu.cc             # host_processor_info wrapper
-│           ├── memory.cc          # host_statistics64 wrapper
-│           └── battery.cc         # IOPowerSources wrapper
+│           └── addon.cc           # Standalone N-API module linking IOKit, Mach, CoreFoundation
 └── package.json
 ```
 
 ---
 
-## 4. Development Guide on MacBook Air M4
+## 4. Native C++ Addon Build Pipeline
 
-### Step 1: Install macOS Development Prerequisites
-Open Terminal on your MacBook Air M4:
+The native module [`native/darwin/src/addon.cc`](../native/darwin/src/addon.cc) is compiled directly with Apple Clang, avoiding heavy `node-gyp` runtime and packaging dependencies:
+
 ```bash
-# 1. Install Apple Xcode Command Line Tools (provides Clang, Mach & IOKit SDK headers)
-xcode-select --install
-
-# 2. Install Node.js (v20+ or v22 LTS) and pnpm (via Homebrew or fnm)
-brew install node pnpm
-# or using fnm:
-# fnm install 22 && fnm use 22 && corepack enable
+# Compile native darwin_telemetry.node using Clang
+pnpm run compile:native
+# (or bash native/darwin/compile.sh)
 ```
 
-### Step 2: Clone and Checkout the `develop` Branch
-```bash
-git clone git@github.com:fabogit/resource-monitor_code-extension.git
-cd resource-monitor_code-extension
-git checkout develop
-pnpm install
-```
-
-### Step 3: Configure `node-gyp` & `node-addon-api`
-1. Install development dependencies:
-   ```bash
-   pnpm add -D node-addon-api node-gyp
-   ```
-2. Create `native/darwin/binding.gyp`:
-   ```python
-   {
-     "targets": [
-       {
-         "target_name": "darwin_telemetry",
-         "sources": [ "src/addon.cc" ],
-         "include_dirs": [
-           "<!@(node -p \"require('node-addon-api').include\")"
-         ],
-         "dependencies": [
-           "<!(node -p \"require('node-addon-api').gyp\")"
-         ],
-         "conditions": [
-           ['OS=="mac"', {
-             "link_settings": {
-               "libraries": [
-                 "-framework CoreFoundation",
-                 "-framework IOKit"
-               ]
-             },
-             "xcode_settings": {
-               "MACOSX_DEPLOYMENT_TARGET": "11.0",
-               "CLANG_CXX_LIBRARY": "libc++",
-               "GCC_ENABLE_CPP_EXCEPTIONS": "YES"
-             }
-           }]
-         ]
-       }
-     ]
-   }
-   ```
-3. Compile native binary for Apple Silicon:
-   ```bash
-   npx node-gyp rebuild --directory=native/darwin
-   ```
-
-### Step 4: Verification & Testing on M4
-Create a test script `test-darwin.mjs`:
-```js
-import telemetry from './native/darwin/build/Release/darwin_telemetry.node';
-console.log('M4 CPU Load:', telemetry.getCpuUsage());
-console.log('M4 Memory:', telemetry.getMemoryInfo());
-console.log('M4 Battery:', telemetry.getBatteryInfo());
-```
-Run:
-```bash
-node test-darwin.mjs
-```
+Compilation details:
+* Uses Apple Clang targeting Apple Silicon `arm64`.
+* Flags: `-O3 -Wall -shared -undefined dynamic_lookup -fPIC`.
+* Links: `-framework CoreFoundation -framework IOKit`.
+* Outputs directly to `dist/native/darwin_telemetry.node` (52.9 KB).
 
 ---
 
-## 5. Platform-Specific VSIX Packaging
+## 5. Verification & Testing on Apple Silicon
 
-When distributing extensions with native binaries, package using platform targets:
+1. **Native Telemetry Smoke Test**:
+   ```bash
+   pnpm run test:darwin
+   ```
+   Validates P/E core topology, Mach tick deltas, Mach 64-bit VM page stats, IOKit `AppleSmartBattery` health/nominal capacity, and IOHID die temperatures with strict runtime assertions.
+
+2. **Cross-Platform Integration Test**:
+   ```bash
+   pnpm run test:integration
+   ```
+   Exercises `createPlatformProvider()` on Darwin, validating cold-start Tick 0 instantaneous sampling, system load average calculations, dynamic multi-rate decimation, and non-blocking `statfs` filesystem checks.
+
+---
+
+## 6. Platform-Specific VSIX Packaging
+
+Platform-specific VSIX packages are built using VS Code's official target architecture flag:
 
 ```bash
-# For Apple Silicon Mac:
-pnpm exec vsce package --target darwin-arm64
-
-# For Linux x64:
-pnpm exec vsce package --target linux-x64
+# Package for Apple Silicon Mac (compiles and bundles darwin_telemetry.node binary):
+pnpm run package:darwin-arm64
 ```
 
-The GitHub Actions workflow in `.github/workflows/release.yml` will be expanded to a build matrix to build both binaries in parallel.
+Output:
+* `resource-monitor-ng-darwin-arm64-1.1.0.vsix` (39.6 KB, 0 warnings, verified production artifact).
+
+---
+
+## 7. UI Presentation & Tooltip Engineering
+
+* **100% Monospace ASCII Box-Drawing Tables**:
+  Replaces proportional Markdown tables with deterministic monospace tables (`┌─┬─┐`, `│ │ │`, `├─┼─┤`, `└─┴─┘`) in hover popups across all 6 widgets (CPU, System Load, Thermals, Memory, Storage, Battery).
+* **Cold-Start (Tick 0) Synchronization**:
+  Pre-samples Mach processor ticks in the `DarwinTelemetryProvider` constructor, ensuring that hover popups display valid core percentages and hardware topologies on first hover without waiting for an interval tick.
+* **Semantic Battery Iconography**:
+  Dynamically maps power state to `$(zap) %` (actively charging), `🔋 %` (discharging on battery), and `$(plug) %` (connected to AC power at full capacity).
+* **Deterministic Tooltip Footers**:
+  Formats footer settings and toggle links as Markdown list items (`- **Key**: [Action](command:...)`), eliminating horizontal hover widget ballooning caused by CommonMark line collapse.

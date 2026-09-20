@@ -8,3 +8,6 @@ dist/
 # Environment & Logs
 *.log
 .DS_Store
+
+# Agents
+.agents/

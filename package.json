@@ -1,11 +1,12 @@
 {
   "name": "resource-monitor-ng",
   "displayName": "Resource Monitor NG",
-  "description": "Ultra-lightweight, zero-overhead Linux resource monitor for VS Code status bar.",
-  "version": "1.0.1",
-  "publisher": "fabo",
+  "description": "Ultra-lightweight, zero-overhead Linux & macOS Apple Silicon resource monitor for VS Code status bar.",
+  "version": "1.1.0",
+  "publisher": "fabogit",
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.105.0",
+    "node": ">=20.0.0"
   },
   "license": "MIT",
   "repository": {
@@ -17,7 +18,7 @@
   ],
   "icon": "images/icon.png",
   "activationEvents": [
-    "*"
+    "onStartupFinished"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -29,6 +30,18 @@
       {
         "command": "resmon.toggleTooltipMode",
         "title": "Resource Monitor: Toggle Tooltip Mode (Static / Live)"
+      },
+      {
+        "command": "resmon.toggleCpuLayout",
+        "title": "Resource Monitor: Toggle CPU Tooltip Layout (Table / List)"
+      },
+      {
+        "command": "resmon.toggleLoadFormat",
+        "title": "Resource Monitor: Toggle System Load Format (Percent / Value)"
+      },
+      {
+        "command": "resmon.toggleDiskMultiDisplay",
+        "title": "Resource Monitor: Toggle Multi-Disk Display Mode (All / MostFull)"
       }
     ],
     "configuration": {
@@ -84,6 +97,15 @@
           "default": [],
           "description": "Specific mount paths to monitor. If empty, monitors the workspace root or '/'."
         },
+        "resmon.disk.multiDisplay": {
+          "type": "string",
+          "enum": [
+            "All",
+            "MostFull"
+          ],
+          "default": "All",
+          "description": "Multi-disk status bar display mode: 'All' displays compact metrics for all monitored disks; 'MostFull' displays only the single volume with highest utilization."
+        },
         "resmon.updatefrequencyms": {
           "type": "number",
           "default": 2000,
@@ -134,6 +156,24 @@
           ],
           "default": "Static",
           "description": "Tooltip refresh mode: 'Static' updates tooltips only on manual click/refresh (preventing hover flicker); 'Live' continuously updates tooltips in real time on every polling tick."
+        },
+        "resmon.tooltip.cpuLayout": {
+          "type": "string",
+          "enum": [
+            "Table",
+            "List"
+          ],
+          "default": "Table",
+          "description": "Layout style for CPU per-core breakdown in tooltips: 'Table' for compact side-by-side grid; 'List' for vertical cluster sections."
+        },
+        "resmon.loadFormat": {
+          "type": "string",
+          "enum": [
+            "Percent",
+            "Value"
+          ],
+          "default": "Percent",
+          "description": "Format for displaying System Load Average on Darwin: 'Percent' (normalized capacity across available cores) or 'Value' (raw POSIX queue depth)."
         }
       }
     }
@@ -142,13 +182,19 @@
     "build": "node esbuild.js --production",
     "watch": "node esbuild.js --watch",
     "typecheck": "tsc --noEmit",
-    "package": "vsce package --no-dependencies --allow-star-activation"
+    "compile:native": "bash native/darwin/compile.sh",
+    "test:darwin": "node test/smoke-darwin.mjs",
+    "test:linux": "node -e \"require('esbuild').buildSync({ entryPoints: ['test/smoke-linux.ts'], outfile: 'dist/test-smoke-linux.cjs', bundle: true, platform: 'node', format: 'cjs' });\" && node dist/test-smoke-linux.cjs && rm -f dist/test-smoke-linux.cjs",
+    "test:integration": "node -e \"require('esbuild').buildSync({ entryPoints: ['test/integration.ts'], outfile: 'dist/test-integration.cjs', bundle: true, platform: 'node', format: 'cjs', external: ['*.node'] });\" && node dist/test-integration.cjs && rm -f dist/test-integration.cjs",
+    "package": "vsce package --no-dependencies",
+    "package:darwin-arm64": "bash native/darwin/compile.sh && vsce package --target darwin-arm64",
+    "package:linux-x64": "vsce package --target linux-x64 --no-dependencies"
   },
   "devDependencies": {
-    "@types/node": "^20.11.0",
-    "@types/vscode": "^1.85.0",
-    "@vscode/vsce": "^3.2.0",
-    "esbuild": "^0.28.0",
-    "typescript": "^7.0.0"
+    "@types/node": "^22.0.0",
+    "@types/vscode": "~1.105.0",
+    "@vscode/vsce": "^3.9.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
   }
 }
