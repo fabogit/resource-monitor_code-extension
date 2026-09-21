@@ -178,7 +178,8 @@ When testing and developing on the Linux PC, execute the following steps in sequ
   - Multi-disk toggle command (`resmon.toggleDiskMultiDisplay`).
 
 ### Phase 4: CI/CD Workflow Finalization
-- [ ] Update [`.github/workflows/release.yml`](../.github/workflows/release.yml) with dual-runner matrix (`macos-14` + `ubuntu-latest`) and `workflow_dispatch`.
-- [ ] Test the packaging scripts:
+- [x] Update [`.github/workflows/release.yml`](../.github/workflows/release.yml) with dual-runner matrix (`macos-14` + `ubuntu-latest`) and `workflow_dispatch`.
+- [x] Test the packaging scripts:
   - `pnpm run package:linux-x64`
+  - `pnpm run package:darwin-arm64`
 - [ ] Verify generated VSIX can be installed via `code --install-extension`.

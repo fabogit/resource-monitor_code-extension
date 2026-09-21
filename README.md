@@ -95,17 +95,22 @@ To provide actionable telemetry without generating inaccurate estimates, Resourc
 
 ## Build, Testing & Packaging
 
-Compile native Apple Silicon telemetry addon:
+### Local Development & Testing
+
+Compile native Apple Silicon telemetry addon (on macOS):
 ```bash
 pnpm run compile:native
 ```
 
-Run test suite:
+Run test suite locally:
 ```bash
-# Darwin native telemetry assertion smoke test:
+# Linux telemetry smoke test (verifies /proc and /sys on Linux):
+pnpm run test:linux
+
+# Darwin native telemetry assertion smoke test (on macOS):
 pnpm run test:darwin
 
-# End-to-end integration test (Tick 0, telemetry data flow, decimation):
+# Cross-platform end-to-end integration test:
 pnpm run test:integration
 ```
 
@@ -115,11 +120,31 @@ pnpm run typecheck
 pnpm run build
 ```
 
-Package platform-specific `.vsix`:
+Package platform-specific `.vsix` packages:
 ```bash
-# Package for macOS Apple Silicon (arm64):
+# Package for macOS Apple Silicon (darwin-arm64):
 pnpm run package:darwin-arm64
 
-# Package for Linux (x64):
+# Package for Linux (linux-x64):
 pnpm run package:linux-x64
 ```
+
+### Multi-Platform CI/CD Testing (GitHub Actions)
+
+The release pipeline ([`.github/workflows/release.yml`](.github/workflows/release.yml)) uses a dual-runner matrix (`macos-14` for Apple Silicon ARM64 + `ubuntu-latest` for Linux x64) to compile and test native bundles in isolated cloud environments.
+
+You can trigger a test build on demand without releasing or tagging:
+
+```bash
+# Trigger the dual-runner workflow manually via GitHub CLI:
+gh workflow run release.yml --ref develop
+
+# Monitor the build execution in real-time:
+gh run watch
+
+# Download the generated .vsix artifacts (darwin-arm64 and linux-x64):
+gh run download <run-id>
+```
+
+When pushing a version tag (e.g. `git tag v1.2.0 && git push origin v1.2.0`), the workflow compiles both native packages and automatically attaches them to a formal GitHub Release.
+

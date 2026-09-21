@@ -102,8 +102,8 @@ Phase 2 focuses on bringing the Linux implementation up to the v1.1.0 architectu
 - [ ] [#5](https://github.com/fabogit/resource-monitor_code-extension/issues/5) **Empirical Benchmarking & Scientific Evaluation**:
   - Measure execution latency of TypeScript VFS reader at 200 ms polling intervals (`performance.now()`) against the < 250 µs SLA budget.
   - Profile V8 garbage collection overhead and heap allocation stability.
-- [ ] [#6](https://github.com/fabogit/resource-monitor_code-extension/issues/6) **Cross-Platform Dual-Runner CI/CD**:
-  - Configure `.github/workflows/release.yml` with dual-runner matrix (`macos-14` + `ubuntu-latest`) and `workflow_dispatch`.
+- [x] [#6](https://github.com/fabogit/resource-monitor_code-extension/issues/6) **Cross-Platform Dual-Runner CI/CD**:
+  - Configured `.github/workflows/release.yml` with decoupled dual-runner matrix (`macos-14` + `ubuntu-latest`), hardened least-privilege permissions, concurrency controls, and `workflow_dispatch` manual build testing.
 
 ---
 
