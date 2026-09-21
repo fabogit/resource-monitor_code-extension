@@ -10,4 +10,5 @@ dist/
 .DS_Store
 
 # Agents
-.agents/
+.agents
+skills-lock.json
