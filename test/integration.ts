@@ -69,7 +69,9 @@ async function run(): Promise<void> {
     console.log(`  - ${disk.mountPath}: ${(disk.usedBytes / 1e9).toFixed(2)} GB used / ${(disk.totalBytes / 1e9).toFixed(2)} GB total (${disk.usedPercent.toFixed(1)}%)`);
   }
 
-  if (!cpu || !freqOrLoad || !mem || disks.length === 0) {
+  // Freq/Load is required on Darwin (system load) but optional on virtualized Linux (no cpufreq in cloud VMs)
+  const isFreqRequired = provider.platformName === 'darwin';
+  if (!cpu || (isFreqRequired && !freqOrLoad) || !mem || disks.length === 0) {
     console.error('\nTEST FAILED: Critical telemetry providers failed!');
     process.exit(1);
   }
